@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% block title %}File Manager Pro - Dashboard{% endblock %}
+
+{% block content %}
+<!-- Upload Section -->
+<section class="upload-section">
+    <h2 class="upload-title">
+        <svg class="upload-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+        </svg>
+        Upload Files
+    </h2>
+    
+    <!-- Drag and Drop Zone -->
+    <div id="dropZone" class="drop-zone">
+        <div class="drop-zone-content">
+            <svg class="upload-icon-large" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z"/>
+            </svg>
+            <div class="drop-text">Drag and drop files here</div>
+            <div class="drop-subtext">or click to browse files</div>
+            <div class="file-input-wrapper">
+                <input type="file" id="fileInput" class="file-input" multiple>
+                <button type="button" class="file-input-button">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                        <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                    </svg>
+                    Choose Files
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Selected Files Display -->
+    <div id="selectedFiles" class="selected-files" style="display: none;">
+        <div class="selected-files-title">Selected Files</div>
+        <div class="files-list"></div>
+    </div>
+
+    <!-- Upload Form -->
+    <form id="uploadForm" class="upload-form" method="POST" action="{{ url_for('add_file') }}" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="description" class="form-label">Description</label>
+            <textarea id="description" name="description" class="form-input form-textarea" placeholder="Enter file description..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="tags" class="form-label">Tags</label>
+            <input type="text" id="tags" name="tags" class="form-input" placeholder="Enter tags separated by commas...">
+        </div>
+        
+        <button type="submit" id="uploadBtn" class="upload-button" disabled>
+            Select Files to Upload
+        </button>
+        
+        <!-- Progress Bar -->
+        <div class="progress-bar" style="display: none;">
+            <div class="progress-fill"></div>
+        </div>
+    </form>
+</section>
+
+<!-- Controls Section -->
+<section class="controls-section">
+    <div class="controls-grid">
+        <div class="search-wrapper">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z"/>
+            </svg>
+            <input type="text" id="searchInput" class="search-input" placeholder="Search files..." value="{{ current_search or '' }}">
+        </div>
+        
+        <div class="form-group">
+            <select id="sortSelect" class="select-input">
+                <option value="date_desc" {{ 'selected' if current_sort == 'date_desc' else '' }}>Newest First</option>
+                <option value="date_asc" {{ 'selected' if current_sort == 'date_asc' else '' }}>Oldest First</option>
+                <option value="name_asc" {{ 'selected' if current_sort == 'name_asc' else '' }}>Name A-Z</option>
+                <option value="name_desc" {{ 'selected' if current_sort == 'name_desc' else '' }}>Name Z-A</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <select id="filterSelect" class="select-input">
+                <option value="all" {{ 'selected' if current_tag == 'all' else '' }}>All Tags</option>
+                {% for tag in all_tags %}
+                    <option value="{{ tag }}" {{ 'selected' if current_tag == tag else '' }}>{{ tag }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <button class="action-button" onclick="window.location.reload()">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"/>
+            </svg>
+            Refresh
+        </button>
+    </div>
+</section>
+
+<!-- Files Section -->
+<section class="files-section">
+    <div class="files-header">
+        <h2 class="files-title">
+            <svg class="upload-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z"/>
+            </svg>
+            Files
+            <span class="files-count">{{ files|length }}</span>
+        </h2>
+    </div>
+
+    <!-- Files Grid View -->
+    <div class="files-grid active" id="filesGrid">
+        {% for file in files %}
+        <div class="file-card">
+            <div class="file-header">
+                <div class="file-type-icon">
+                    {% set extension = file.original_filename.split('.')[-1].upper() %}
+                    {{ extension[:3] if extension else 'FILE' }}
+                </div>
+                <div class="file-actions">
+                    <button class="file-action" onclick="window.location.href='{{ url_for('download_file', file_id=file.id) }}'" title="Download">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                            <path d="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z"/>
+                        </svg>
+                    </button>
+                    <button class="file-action" onclick="window.location.href='{{ url_for('edit_file', file_id=file.id) }}'" title="Edit">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                            <path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/>
+                        </svg>
+                    </button>
+                    <button class="file-action danger" onclick="deleteFile({{ file.id }})" title="Delete">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                            <path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="file-details">
+                <h3>{{ file.original_filename }}</h3>
+                <p class="file-description">{{ file.description or 'No description' }}</p>
+                <div class="file-meta">
+                    <span>{{ file.date_added }}</span>
+                    <span>{{ file.download_count or 0 }} downloads</span>
+                </div>
+                {% if file.tags %}
+                <div class="file-tags">
+                    {% for tag in file.tags.split(',') %}
+                        <span class="tag">{{ tag.strip() }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Files List View -->
+    <div class="files-list" id="filesList">
+        {% for file in files %}
+        <div class="file-list-item">
+            <div class="file-type-icon">
+                {% set extension = file.original_filename.split('.')[-1].upper() %}
+                {{ extension[:3] if extension else 'FILE' }}
+            </div>
+            <div>
+                <div class="file-name">{{ file.original_filename }}</div>
+                <div class="file-description">{{ file.description or 'No description' }}</div>
+                {% if file.tags %}
+                <div class="file-tags">
+                    {% for tag in file.tags.split(',') %}
+                        <span class="tag">{{ tag.strip() }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            <div>{{ file.date_added }}</div>
+            <div>{{ file.download_count or 0 }} downloads</div>
+            <div class="file-actions">
+                <button class="file-action" onclick="window.location.href='{{ url_for('download_file', file_id=file.id) }}'" title="Download">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                        <path d="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z"/>
+                    </svg>
+                </button>
+                <button class="file-action" onclick="window.location.href='{{ url_for('edit_file', file_id=file.id) }}'" title="Edit">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                        <path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/>
+                    </svg>
+                </button>
+                <button class="file-action danger" onclick="deleteFile({{ file.id }})" title="Delete">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                        <path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not files %}
+    <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="64" height="64" style="opacity: 0.3; margin-bottom: 1rem;">
+            <path d="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z"/>
+        </svg>
+        <h3>No files found</h3>
+        <p>Upload some files to get started!</p>
+    </div>
+    {% endif %}
+</section>
+
+<!-- Restore Modal -->
+<div id="restoreModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Create Backup</h3>
+            <button class="modal-close" onclick="closeRestoreModal()">×</button>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem;">
+                This will create a backup of all team files and download it to your device.
+            </p>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                <button type="button" class="action-button secondary" onclick="closeRestoreModal()">Cancel</button>
+                <button type="button" class="action-button primary" onclick="window.location.href='{{ url_for('create_backup') }}'">Create Backup</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function deleteFile(fileId) {
+    if (confirm('Are you sure you want to delete this file?')) {
+        fetch(`/delete/${fileId}`, {
+            method: 'POST'
+        }).then(response => {
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Error deleting file');
+            }
+        });
+    }
+}
+
+function openRestoreModal() {
+    document.getElementById('restoreModal').classList.add('show');
+}
+
+function closeRestoreModal() {
+    document.getElementById('restoreModal').classList.remove('show');
+}
+
+// Add restore button functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const backupBtn = document.getElementById('backupBtn');
+    if (backupBtn) {
+        backupBtn.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            openRestoreModal();
+        });
+        
+        // Add tooltip for right-click
+        backupBtn.title = 'Left click: Create Backup | Right click: Restore';
+    }
+});
+</script>
+{% endblock %}
+
